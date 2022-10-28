@@ -16,9 +16,14 @@ permanent = true
 [entryPoints.websecure]
 address = ":443"
 
+[log]
+level = "info"
+
 [api]
 dashboard = true
 insecure = false
+
+[ping]
 
 [providers]
 [providers.docker]

@@ -2,22 +2,22 @@ services:
   traefik:
     image: traefik:v2.6
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./traefik.toml:/etc/traefik/traefik.toml
-      - ./configs/:/etc/traefik/configs/
-      - ./ssl:/etc/ssl
-      - /var/run/docker.sock:/var/run/docker.sock
-    healthcheck:
-      test: [CMD, "sh", "-c", "traefik healthcheck"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     labels:
       traefik.enable: true
       traefik.http.routers.traefik.tls: true
       traefik.http.routers.traefik.entrypoints: websecure
       traefik.http.routers.traefik.service: "api@internal"
       traefik.http.routers.traefik.rule: "Host(`traefik.phpcon-dev.pl`)"
+    volumes:
+      - ./traefik.toml:/etc/traefik/traefik.toml
+      - ./configs/:/etc/traefik/configs/
+      - ./ssl:/etc/ssl
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "80:80"
+      - "443:443"
+    healthcheck:
+      test: [ CMD, "sh", "-c", "traefik healthcheck" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
