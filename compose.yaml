@@ -8,6 +8,9 @@ services:
       traefik.http.routers.traefik.entrypoints: websecure
       traefik.http.routers.traefik.service: "api@internal"
       traefik.http.routers.traefik.rule: "Host(`traefik.phpcon-dev.pl`)"
+    networks:
+      default: ~
+      phpcon-dev: ~
     volumes:
       - ./traefik.toml:/etc/traefik/traefik.toml
       - ./configs/:/etc/traefik/configs/
@@ -21,3 +24,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+networks:
+  phpcon-dev:
+    external: true
