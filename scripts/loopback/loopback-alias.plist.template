@@ -3,7 +3,7 @@
 <plist>
     <dict>
         <key>Label</key>
-        <string>com.runlevel1.lo0.172.16.123.1</string>
+        <string>{{LABEL}}</string>
         <key>RunAtLoad</key>
         <true/>
         <key>ProgramArguments</key>
@@ -11,7 +11,7 @@
             <string>/sbin/ifconfig</string>
             <string>lo0</string>
             <string>alias</string>
-            <string>172.16.123.1</string>
+            <string>{{LOOPBACK_IP}}</string>
         </array>
         <key>StandardErrorPath</key>
         <string>/var/log/loopback-alias.log</string>

@@ -1,0 +1,15 @@
+# Environment configuration
+.env
+
+# SSL certificates and keys
+ssl/*.crt
+ssl/*.key
+ssl/*.pem
+
+# Generated configuration files
+configs/certs.toml
+
+# IDE
+.idea/
+.claude
+CLAUDE.md

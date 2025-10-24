@@ -2,23 +2,26 @@ services:
   traefik:
     image: traefik:v2.6
     restart: unless-stopped
+    environment:
+      - DOMAIN=${DOMAIN}
+      - TRAEFIK_LOG_LEVEL=${TRAEFIK_LOG_LEVEL:-INFO}
     labels:
       traefik.enable: true
       traefik.http.routers.traefik.tls: true
       traefik.http.routers.traefik.entrypoints: websecure
       traefik.http.routers.traefik.service: "api@internal"
-      traefik.http.routers.traefik.rule: "Host(`traefik.phpcon-dev.pl`)"
+      traefik.http.routers.traefik.rule: "Host(`${TRAEFIK_DASHBOARD_SUBDOMAIN:-traefik}.${DOMAIN}`)"
     networks:
       default: ~
-      phpcon-dev: ~
+      ${DOCKER_NETWORK_NAME:-local}: ~
     volumes:
       - ./traefik.toml:/etc/traefik/traefik.toml
       - ./configs/:/etc/traefik/configs/
-      - ./ssl:/etc/ssl
+      - ${SSL_DIR:-./ssl}:/etc/ssl
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "80:80"
-      - "443:443"
+      - "${LOOPBACK_IP:-172.16.123.1}:80:80"
+      - "${LOOPBACK_IP:-172.16.123.1}:443:443"
     healthcheck:
       test: [ CMD, "sh", "-c", "traefik healthcheck" ]
       interval: 5s
@@ -26,5 +29,5 @@ services:
       retries: 5
 
 networks:
-  phpcon-dev:
+  ${DOCKER_NETWORK_NAME:-local}:
     external: true

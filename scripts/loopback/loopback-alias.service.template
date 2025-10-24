@@ -1,0 +1,11 @@
+[Unit]
+Description=Loopback alias for {{LOOPBACK_IP}}
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ifconfig lo:0 {{LOOPBACK_IP}} netmask {{LOOPBACK_NETMASK}} up
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
