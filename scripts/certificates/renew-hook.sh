@@ -4,16 +4,15 @@
 # This script is called by certbot after successful certificate renewal
 #
 # Installation:
-#   1. Update TRAEFIK_DIR below to point to your Traefik installation
-#   2. Copy this script to: /etc/letsencrypt/renewal-hooks/deploy/traefik-renew.sh
-#   3. Make it executable: sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/traefik-renew.sh
+#   Run: make install-renew-hook
+#   This automatically sets TRAEFIK_DIR and copies the script to the deploy hooks directory.
 #
 # Certbot will automatically run this script after renewing certificates
 
 set -e
 
-# IMPORTANT: Update this path to your Traefik installation
-TRAEFIK_DIR="/path/to/your/traefik"
+# This path is replaced automatically by `make install-renew-hook`
+TRAEFIK_DIR="${TRAEFIK_DIR:-/path/to/your/traefik}"
 
 # Load configuration from the Traefik installation
 if [ ! -f "${TRAEFIK_DIR}/.env" ]; then

@@ -89,10 +89,12 @@ setup-certs: ## Copy Let's Encrypt certificates to Traefik (requires sudo)
 install-renew-hook: ## Install automatic renewal hook for Let's Encrypt
 	@echo "Installing renewal hook..."
 	@sudo mkdir -p /etc/letsencrypt/renewal-hooks/deploy
-	@sudo cp scripts/certificates/renew-hook.sh /etc/letsencrypt/renewal-hooks/deploy/traefik-renew.sh
+	@sudo sed 's|TRAEFIK_DIR="$${TRAEFIK_DIR:-/path/to/your/traefik}"|TRAEFIK_DIR="$(CURDIR)"|' \
+		scripts/certificates/renew-hook.sh > /tmp/traefik-renew.sh
+	@sudo mv /tmp/traefik-renew.sh /etc/letsencrypt/renewal-hooks/deploy/traefik-renew.sh
 	@sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/traefik-renew.sh
 	@echo "✓ Renewal hook installed at /etc/letsencrypt/renewal-hooks/deploy/traefik-renew.sh"
-	@echo "  Edit the script to update TRAEFIK_DIR if needed"
+	@echo "  TRAEFIK_DIR set to: $(CURDIR)"
 
 test-renewal: ## Test Let's Encrypt renewal process (dry run)
 	sudo certbot renew --dry-run
