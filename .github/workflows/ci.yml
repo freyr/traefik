@@ -12,20 +12,43 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# The checks run in Docker images pinned in the Makefile, so `make qa` runs the same checks locally.
 jobs:
   lint:
-    name: Lint (workflows)
+    name: Lint (shell, workflows)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: ShellCheck and shfmt
+        run: make lint-shell
       - name: actionlint
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
 
+  config:
+    name: Config (compose.yaml, Traefik static configuration)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate compose.yaml and start Traefik with its configuration
+        run: make check-config
+
+  test:
+    name: Test (bats)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run the bats tests
+        run: make test
+
   ci-gate:
     if: always()
-    needs: [lint]
+    needs: [lint, config, test]
     runs-on: ubuntu-latest
     steps:
       - uses: freyr/.github/actions/ci-gate@3f8fbbcf74283946ee3a7f63e21dd19bf02cdb77 # v1.0.0
