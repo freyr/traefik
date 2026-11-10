@@ -95,5 +95,32 @@ demo-down: ## Remove the demo stacks
 remove-legacy: ## Remove the loopback alias and certbot renewal of the old setup (sudo)
 	sudo LOOPBACK_IP=$${LOOPBACK_IP:-172.16.123.1} ./scripts/legacy/remove-legacy.sh
 
+##@ Quality checks (run in Docker; the same commands run in CI)
+SHELLCHECK_IMAGE := koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
+SHFMT_IMAGE      := mvdan/shfmt:v3.12.0@sha256:307d265ffd25ce832899ae17c93ed5062fc3375c514bba8f52cbf52792735c4d
+ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+BATS_IMAGE       := bats/bats:1.13.0@sha256:6e4b9369468b7f3fd8f402ac6cc8ea7b2e4903eae28d08785f31a0245eb51a44
+SHELL_FILES       = $(shell find scripts tests -name '*.sh' -o -name '*.bats' -o -name '*.bash')
+DOCKER_RUN       := docker run --rm -v "$(CURDIR):/mnt" -w /mnt
+
+qa: lint check-config test ## Run all quality checks
+
+lint: lint-shell lint-actions ## Run ShellCheck, shfmt and actionlint
+
+lint-shell: ## Run ShellCheck and shfmt (diff mode) on the shell scripts and tests
+	$(DOCKER_RUN) $(SHELLCHECK_IMAGE) $(SHELL_FILES)
+	$(DOCKER_RUN) $(SHFMT_IMAGE) -d scripts tests
+
+lint-actions: ## Run actionlint on the GitHub workflows
+	$(DOCKER_RUN) $(ACTIONLINT_IMAGE) -no-color
+
+check-config: ## Validate compose.yaml and start Traefik with its static configuration
+	$(COMPOSE) --env-file .env.example config --quiet
+	./tests/check-traefik-config.sh
+
+test: ## Run the bats tests of the scripts
+	$(DOCKER_RUN) $(BATS_IMAGE) tests
+
 .PHONY: help create check-env install-deps certs renew-certs cert-info dns remove-dns \
-	start stop restart destroy logs status sync-networks demo-up demo-test demo-down remove-legacy
+	start stop restart destroy logs status sync-networks demo-up demo-test demo-down remove-legacy \
+	qa lint lint-shell lint-actions check-config test

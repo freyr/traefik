@@ -193,6 +193,22 @@ keyFile = "/etc/ssl/{{KEY_FILE}}"
 
 ### Testing
 
+#### Automated Checks
+
+Run the checks before you open a PR. They need only Docker, and CI runs the same commands:
+
+```bash
+make qa            # all checks below
+make lint-shell    # ShellCheck and shfmt (diff mode) on scripts/ and tests/
+make lint-actions  # actionlint on .github/workflows/
+make check-config  # docker compose config, and Traefik starts with the flags of compose.yaml
+make test          # bats tests in tests/
+```
+
+To fix the formatting, run
+`docker run --rm -v "$PWD:/mnt" -w /mnt mvdan/shfmt:v3.12.0 -w scripts tests`.
+A change to a script in `scripts/` needs a bats test in `tests/`.
+
 #### Manual Testing Checklist
 
 Test your changes on:
@@ -306,6 +322,7 @@ traefik/
 │   ├── networks/        # network-sync (POSIX sh, runs in a container)
 │   ├── demo/            # End-to-end checks
 │   └── legacy/          # Cleanup of the Let's Encrypt version
+├── tests/               # bats tests and the Traefik config check (make qa)
 ├── guides/              # Detailed guides (topic-specific)
 └── [documentation]      # README, SETUP, CONTRIBUTING, etc.
 ```
