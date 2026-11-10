@@ -1,0 +1,8 @@
+# shfmt reads these settings.
+[*.{sh,bash,bats}]
+indent_style = space
+indent_size = 4
+
+# POSIX sh script for the docker:cli image; it keeps its 2-space indent.
+[scripts/networks/sync.sh]
+indent_size = 2

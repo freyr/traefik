@@ -18,7 +18,7 @@
 # POSIX sh: runs in the docker:cli image (busybox).
 
 PROXY="${PROXY_CONTAINER:-traefik}"
-KNOWN="${TMPDIR:-/tmp}/network-sync.known"   # edge networks this process connected
+KNOWN="${TMPDIR:-/tmp}/network-sync.known" # edge networks this process connected
 
 log() { echo "[network-sync] $*"; }
 
@@ -32,6 +32,7 @@ routed_snapshot() {
 }
 
 # Sorted, space-separated hostnames from Host() rules of the given containers.
+# shellcheck disable=SC2016 # the backticks are literal characters of the Host() rule
 hosts_of() {
   [ $# -eq 0 ] && return
   docker inspect --format '{{range $k, $v := .Config.Labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' "$@" 2>/dev/null |
@@ -54,10 +55,15 @@ proxy_networks() {
 is_connected() { proxy_networks | grep -qx "$1"; }
 
 remember() { grep -qx "$1" "$KNOWN" 2>/dev/null || echo "$1" >>"$KNOWN"; }
-forget() { [ -f "$KNOWN" ] && grep -vx "$1" "$KNOWN" >"$KNOWN.tmp"; mv -f "$KNOWN.tmp" "$KNOWN" 2>/dev/null; }
+forget() {
+  [ -f "$KNOWN" ] && grep -vx "$1" "$KNOWN" >"$KNOWN.tmp"
+  mv -f "$KNOWN.tmp" "$KNOWN" 2>/dev/null
+}
 
 connect() {
-  net="$1"; hosts="$2"; args=""
+  net="$1"
+  hosts="$2"
+  args=""
   for h in $hosts; do args="$args --alias $h"; done
   # shellcheck disable=SC2086
   if docker network connect $args "$net" "$PROXY"; then
@@ -113,9 +119,11 @@ sync_once() {
 # still attached: empty, and the compose project has no containers left.
 sweep() {
   [ -s "$KNOWN" ] || return
+  # shellcheck disable=SC2013 # Docker network names have no spaces
   for net in $(sort -u "$KNOWN"); do
     if ! docker network inspect "$net" >/dev/null 2>&1; then
-      forget "$net"; continue
+      forget "$net"
+      continue
     fi
     is_connected "$net" && continue
     [ "$(docker network inspect --format '{{len .Containers}}' "$net" 2>/dev/null)" = "0" ] || continue
@@ -130,7 +138,10 @@ sweep() {
 }
 
 status() {
-  proxy_exists || { echo "proxy container '$PROXY' not found"; return 1; }
+  proxy_exists || {
+    echo "proxy container '$PROXY' not found"
+    return 1
+  }
   echo "Networks of $PROXY:"
   for net in $(proxy_networks); do
     echo "  $net  aliases: $(proxy_aliases "$net")"
@@ -138,23 +149,29 @@ status() {
 }
 
 case "${1:-once}" in
-  once) sync_once; sweep ;;
-  status) status ;;
-  watch)
-    log "watching Docker events (proxy: $PROXY)"
-    sync_once
-    docker events --filter type=container \
-      --filter event=start --filter event=kill --filter event=die --filter event=destroy \
-      --format '{{.Action}} {{.Actor.ID}}' |
-      while read -r action id; do
-        case "$action" in
-          kill) sync_once "$id" ;;   # stopping: detach before it exits
-          *) sync_once ;;
-        esac
-        sweep
-      done
-    log "Docker event stream ended"
-    exit 1
-    ;;
-  *) echo "Usage: $0 once|watch|status" >&2; exit 2 ;;
+once)
+  sync_once
+  sweep
+  ;;
+status) status ;;
+watch)
+  log "watching Docker events (proxy: $PROXY)"
+  sync_once
+  docker events --filter type=container \
+    --filter event=start --filter event=kill --filter event=die --filter event=destroy \
+    --format '{{.Action}} {{.Actor.ID}}' |
+    while read -r action id; do
+      case "$action" in
+      kill) sync_once "$id" ;; # stopping: detach before it exits
+      *) sync_once ;;
+      esac
+      sweep
+    done
+  log "Docker event stream ended"
+  exit 1
+  ;;
+*)
+  echo "Usage: $0 once|watch|status" >&2
+  exit 2
+  ;;
 esac

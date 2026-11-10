@@ -21,9 +21,9 @@ fi
 
 mkdir -p "$SSL_DIR"
 
-if [[ "$FORCE" != "--force" && -f "$CERT" && -f "$KEY" ]] \
-    && openssl x509 -in "$CERT" -noout -text | grep -qF "DNS:*.${DOMAIN}" \
-    && openssl x509 -in "$CERT" -noout -checkend $((30 * 86400)) >/dev/null; then
+if [[ "$FORCE" != "--force" && -f "$CERT" && -f "$KEY" ]] &&
+    openssl x509 -in "$CERT" -noout -text | grep -qF "DNS:*.${DOMAIN}" &&
+    openssl x509 -in "$CERT" -noout -checkend $((30 * 86400)) >/dev/null; then
     echo "✓ Certificate for *.${DOMAIN} exists and is valid for 30+ days (use make renew-certs to replace it)"
     exit 0
 fi

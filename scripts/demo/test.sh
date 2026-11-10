@@ -10,13 +10,23 @@ CA="${SSL_DIR}/rootCA.pem"
 fails=0
 
 pass() { echo "  ✓ $*"; }
-fail() { echo "  ✗ $*"; fails=$((fails + 1)); }
+fail() {
+    echo "  ✗ $*"
+    fails=$((fails + 1))
+}
 
 # Retries a command for up to 10 s (network-sync reacts to events asynchronously).
-retry() { for _ in $(seq 1 20); do "$@" >/dev/null 2>&1 && return 0; sleep 0.5; done; return 1; }
+retry() {
+    for _ in $(seq 1 20); do
+        "$@" >/dev/null 2>&1 && return 0
+        sleep 0.5
+    done
+    return 1
+}
 
 expect_body() { # expected, curl args...
-    local want="$1"; shift
+    local want="$1"
+    shift
     [ "$(curl -fsS --max-time 3 "$@" 2>/dev/null)" = "$want" ]
 }
 
@@ -47,7 +57,7 @@ for s in "${STACKS[@]}"; do
     fi
 done
 code=$(curl -s -o /dev/null -w '%{http_code}' --resolve "alpha.$DOMAIN:80:127.0.0.1" "http://alpha.$DOMAIN")
-case "$code" in 301|308) pass "http:// redirects to https:// ($code)" ;; *) fail "http:// returned $code, expected 301 or 308" ;; esac
+case "$code" in 301 | 308) pass "http:// redirects to https:// ($code)" ;; *) fail "http:// returned $code, expected 301 or 308" ;; esac
 
 echo "Inside a stack"
 if retry docker exec alpha-web-1 curl -fsS --max-time 3 --cacert /certs/rootCA.pem "https://alpha.$DOMAIN"; then

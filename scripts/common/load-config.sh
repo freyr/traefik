@@ -2,7 +2,8 @@
 # Loads .env and sets defaults. Source this at the start of every script.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+export PROJECT_ROOT
 
 ENV_FILE="${PROJECT_ROOT}/.env"
 if [ -f "$ENV_FILE" ]; then
