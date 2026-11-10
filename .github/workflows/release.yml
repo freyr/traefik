@@ -1,0 +1,28 @@
+# On each push to main, push the next tag (vX.Y.Z) and create the GitHub release.
+# This repo has no version file: the next tag comes from the last tag and the squash
+# commit title. The release App pushes the tag.
+# Replace FREYR_SHA with the commit of freyr/.github.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      releases: ${{ steps.release.outputs.releases }}
+    steps:
+      - id: release
+        uses: freyr/.github/actions/release@FREYR_SHA # v1.0.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

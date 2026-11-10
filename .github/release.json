@@ -1,0 +1,13 @@
+{
+  "packages": [
+    {
+      "name": "traefik",
+      "path": ".",
+      "tag": "v{version}",
+      "version_files": [],
+      "ignore": ["*.md", "guides/**", ".idea/**"],
+      "min_bump": "none",
+      "initial": "1.0.0"
+    }
+  ]
+}
