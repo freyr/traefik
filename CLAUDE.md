@@ -1,67 +1,37 @@
 # Traefik
 
-Local development reverse proxy routing HTTPS for `*.example.dev` via loopback alias `172.16.123.1`.
+Local development reverse proxy: HTTPS for `*.DOMAIN` (default `freyr.test`) with a mkcert wildcard certificate, a dnsmasq container for DNS, and one isolated edge network per routed stack.
 
 ## Critical Rules
 
-- **TFK001**: First-time setup requires `sudo make create` — installs loopback alias LaunchDaemon on macOS.
-- **TFK002**: Services must opt in with `traefik.enable=true` label — `exposedByDefault` is false.
-- **TFK003**: SSL key must have `644` permissions — Docker container needs read access.
-- **TFK004**: Use `fullchain.pem` (not `cert.pem`) — includes intermediate certificates.
+- **TFK001**: First-time setup is `make create` (asks for sudo for `mkcert -install` and the resolver file). Never run make with sudo.
+- **TFK002**: Services opt in with `traefik.enable=true`; `exposedByDefault` is false.
+- **TFK003**: Every routed container needs `traefik.docker.network: <full network name>`. Traefik uses it to choose the network, and network-sync uses it to connect Traefik.
+- **TFK004**: Stacks never share a network with each other. No shared `local` network: Traefik joins each stack's edge network instead.
+- **TFK005**: Static Traefik config lives in `command:` in `compose.yaml` (so `.env` values apply). Dynamic config goes in `configs/`.
 
-## Quick Start
-
-```bash
-# One-time setup (requires sudo on macOS)
-sudo make create           # Loopback alias + network + start Traefik
-
-# Daily operations
-make start                 # Start Traefik
-make stop                  # Stop Traefik
-make destroy               # Remove everything
-make                       # Show help
-```
-
-## Certificate Management
+## Commands
 
 ```bash
-make setup-certs           # Copy Let's Encrypt certs to Traefik
-make install-renew-hook    # Post-renewal hook
-make setup-auto-renewal    # Automatic renewal (macOS LaunchDaemon)
-make test-renewal          # Dry-run renewal test
-```
-
-## Service Discovery
-
-Add these Docker labels to expose a service:
-
-```yaml
-labels:
-  traefik.enable: true
-  traefik.http.routers.<service>.tls: true
-  traefik.http.routers.<service>.entrypoints: websecure
-  traefik.http.routers.<service>.rule: "Host(`subdomain.example.dev`)"
+make create        # first-time: mkcert, CA + cert, start, DNS
+make start|stop|restart|destroy|logs|status
+make certs         # create cert if missing/invalid; make renew-certs to force
+make dns           # resolver for DOMAIN -> dns container
+make sync-networks # force network-sync pass
+make demo-up && make demo-test && make demo-down   # end-to-end check
+make remove-legacy # remove loopback alias + certbot renewal of the old setup
 ```
 
 ## Architecture
 
-- Traffic flow: Client → 172.16.123.1:443 → Traefik → containers on `local` Docker network
-- Static config: `traefik.toml` (entrypoints, providers)
-- TLS config: `configs/certs.toml` + `ssl/` directory
-- Auto HTTP→HTTPS redirect; dashboard at `https://traefik.example.dev`
-- Platform setup: macOS (LaunchDaemon), Linux (systemd), Windows (manual)
-
-## References
-
-- [SETUP.md](SETUP.md) — Complete first-time setup (DNS, certificates, loopback)
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Common issues and solutions
+- `compose.yaml`: `traefik` (127.0.0.1:80/443, docker socket read-only), `dns` (dnsmasq on 127.0.0.1:53, answers only `DOMAIN`), `network-sync` (docker CLI watching events, runs `scripts/networks/sync.sh watch`).
+- network-sync connects Traefik to each network named by `traefik.docker.network` on running routed containers, with the `Host()` names as aliases; disconnects on `kill`; removes leftover edge networks after `compose down`.
+- Certificate files: `ssl/local.crt`, `ssl/local.key`, `ssl/rootCA.pem` (fixed names, loaded by `configs/certs.toml`).
+- Verify any change with `make demo-up && make demo-test && make demo-down`.
 
 ## Boundaries
 
 **NEVER:**
-- Commit SSL private keys to git
-- Modify loopback alias config without testing connectivity afterward
-
-**ASK FIRST:**
-- Changes to Traefik entrypoints or providers
-- New wildcard domains or certificate changes
+- Commit `ssl/*` key or certificate files, or `.env`
+- Copy or reference `$(mkcert -CAROOT)/rootCA-key.pem`
+- Mount the docker socket read-write into Traefik (only network-sync needs write)

@@ -1,52 +1,17 @@
-# Scripts Directory
+# Scripts
 
-This directory contains all automation scripts for the Traefik development environment.
+The make targets call these scripts. Each Bash script loads `.env` through
+`common/load-config.sh`; run them from any directory.
 
-## Directory Structure
+| Script | Make target | Purpose |
+|---|---|---|
+| `common/load-config.sh` | — | Loads `.env`, checks `DOMAIN`, sets defaults, makes `SSL_DIR` absolute. Source it first in every new script. |
+| `certs/generate.sh [--force]` | `certs`, `renew-certs` | `mkcert -install`, then the `DOMAIN` + `*.DOMAIN` certificate into `SSL_DIR`. |
+| `dns/setup.sh` | `dns` | Resolver for `DOMAIN` → `127.0.0.1:DNS_PORT` (macOS `/etc/resolver`, Linux systemd-resolved). Calls sudo. |
+| `dns/remove.sh` | `remove-dns` | Removes that resolver file. |
+| `networks/sync.sh once\|watch\|status` | `sync-networks`, `status` | POSIX sh, runs in the network-sync container. Connects Traefik to edge networks with `Host()` aliases, disconnects, sweeps leftover networks. |
+| `demo/test.sh` | `demo-test` | End-to-end checks of the demo stacks. |
+| `legacy/remove-legacy.sh` | `remove-legacy` | Removes the loopback alias and certbot renewal of the Let's Encrypt version. Needs sudo. |
 
-```
-scripts/
-├── loopback/          # Loopback alias management (172.16.123.1)
-├── certificates/      # SSL certificate management
-└── setup/            # Initial setup scripts (reserved for future use)
-```
-
-## Usage
-
-Scripts are organized by functionality. Use the provided Makefile targets instead of running scripts directly:
-
-```bash
-# Loopback management
-make create-loopback    # Setup loopback alias
-make remove-loopback    # Remove loopback alias
-
-# Certificate management
-make setup-certs            # Copy certificates to Traefik
-make install-renew-hook     # Install renewal hook
-make setup-auto-renewal     # Setup automatic renewal
-make remove-auto-renewal    # Remove automatic renewal
-make test-renewal           # Test renewal process
-```
-
-## Direct Script Execution
-
-If you need to run scripts directly:
-
-```bash
-# Loopback
-sudo ./scripts/loopback/add-alias.sh
-sudo ./scripts/loopback/remove-alias.sh
-
-# Certificates
-sudo ./scripts/certificates/setup-certificates.sh
-sudo ./scripts/certificates/setup-auto-renewal.sh
-```
-
-## Adding New Scripts
-
-When adding new scripts:
-1. Place in appropriate subdirectory (loopback, certificates, or setup)
-2. Make executable: `chmod +x scripts/category/script-name.sh`
-3. Add Makefile target in root Makefile
-4. Update this README
-5. Document in main CLAUDE.md or SETUP.md
+New user-facing script: add a make target with a `##` description so it
+appears in `make help`.
