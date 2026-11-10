@@ -1,33 +1,71 @@
+name: traefik
+
 services:
   traefik:
-    image: traefik:v2.6
+    image: ${TRAEFIK_IMAGE:-traefik:v3.7}
+    container_name: ${PROXY_CONTAINER:-traefik}
     restart: unless-stopped
-    environment:
-      - DOMAIN=${DOMAIN}
-      - TRAEFIK_LOG_LEVEL=${TRAEFIK_LOG_LEVEL:-INFO}
+    # Static configuration. Kept as CLI flags so values from .env apply
+    # (Traefik ignores environment variables when a static config file exists).
+    command:
+      - --global.checkNewVersion=false
+      - --global.sendAnonymousUsage=false
+      # Drop headers whose names alias a managed header (X_Auth_User for
+      # X-Auth-User); PHP/nginx backends would read them as the real one.
+      - --global.aliasHeadersStrategy=delete
+      - --log.level=${TRAEFIK_LOG_LEVEL:-INFO}
+      - --api.dashboard=true
+      - --ping=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --providers.file.directory=/etc/traefik/configs
+      - --providers.file.watch=true
     labels:
-      traefik.enable: true
-      traefik.http.routers.traefik.tls: true
-      traefik.http.routers.traefik.entrypoints: websecure
-      traefik.http.routers.traefik.service: "api@internal"
-      traefik.http.routers.traefik.rule: "Host(`${TRAEFIK_DASHBOARD_SUBDOMAIN:-traefik}.${DOMAIN}`)"
-    networks:
-      default: ~
-      local: ~
-    volumes:
-      - ./traefik.toml:/etc/traefik/traefik.toml
-      - ./configs/:/etc/traefik/configs/
-      - ${SSL_DIR:-./ssl}:/etc/ssl
-      - /var/run/docker.sock:/var/run/docker.sock
+      traefik.enable: "true"
+      traefik.http.routers.dashboard.rule: "Host(`${TRAEFIK_DASHBOARD_SUBDOMAIN:-traefik}.${DOMAIN:?Set DOMAIN in .env}`)"
+      traefik.http.routers.dashboard.entrypoints: websecure
+      traefik.http.routers.dashboard.service: api@internal
     ports:
-      - "80:80"
-      - "443:443"
+      - "${BIND_IP:-127.0.0.1}:80:80"
+      - "${BIND_IP:-127.0.0.1}:443:443"
+    volumes:
+      - ./configs:/etc/traefik/configs:ro
+      - ${SSL_DIR:-./ssl}:/certs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
-      test: [ CMD, "sh", "-c", "traefik healthcheck" ]
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-networks:
-  local:
-    external: true
+  # Answers *.DOMAIN with 127.0.0.1. The host resolver sends only DOMAIN
+  # queries here (make dns), so all other DNS traffic is unchanged.
+  dns:
+    build: ./docker/dnsmasq
+    image: freyr-traefik-dns:local
+    restart: unless-stopped
+    command: ["--address=/${DOMAIN:?Set DOMAIN in .env}/127.0.0.1"]
+    ports:
+      - "127.0.0.1:${DNS_PORT:-53}:53/udp"
+      - "127.0.0.1:${DNS_PORT:-53}:53/tcp"
+
+  # Connects the proxy to the edge network of every routed container and
+  # gives it the router hostnames as network aliases. See scripts/networks/sync.sh.
+  network-sync:
+    image: ${DOCKER_CLI_IMAGE:-docker:29-cli}
+    restart: unless-stopped
+    network_mode: none
+    depends_on:
+      - traefik
+    environment:
+      PROXY_CONTAINER: ${PROXY_CONTAINER:-traefik}
+    entrypoint: ["sh", "/usr/local/bin/sync-networks", "watch"]
+    volumes:
+      - ./scripts/networks/sync.sh:/usr/local/bin/sync-networks:ro
+      - /var/run/docker.sock:/var/run/docker.sock

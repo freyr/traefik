@@ -1,0 +1,34 @@
+# One stack of the demo: run it with a project name, e.g.
+#   STACK=alpha docker compose -p alpha -f examples/isolated-stacks/compose.yaml up -d
+# make demo-up starts alpha, beta and gamma. Each stack has:
+#   web      nginx on port 80, routed as https://<stack>.<DOMAIN>
+#   backend  nginx on port 80, reachable only inside the stack
+# The stacks share no network, so they cannot reach each other.
+#
+# Labels use the list form because Compose interpolates values, not keys.
+
+services:
+  web:
+    image: nginx:alpine
+    environment:
+      STACK: ${STACK:?Set STACK}
+    command: ["sh", "-c", "echo \"$$STACK\" > /usr/share/nginx/html/index.html && exec nginx -g 'daemon off;'"]
+    networks: [edge, internal]
+    volumes:
+      # Lets the container trust https://*.<DOMAIN> (curl --cacert /certs/rootCA.pem).
+      - ${CA_FILE:?Set CA_FILE to the path of rootCA.pem}:/certs/rootCA.pem:ro
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${STACK}_edge
+      - traefik.http.routers.${STACK}.rule=Host(`${STACK}.${DOMAIN:-freyr.test}`)
+
+  backend:
+    image: nginx:alpine
+    environment:
+      STACK: ${STACK}
+    command: ["sh", "-c", "echo \"$$STACK backend\" > /usr/share/nginx/html/index.html && exec nginx -g 'daemon off;'"]
+    networks: [internal]
+
+networks:
+  edge: {}
+  internal: {}

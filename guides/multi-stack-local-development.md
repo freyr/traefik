@@ -300,7 +300,8 @@ Now `http://api.localhost` in a browser routes to the `php-api` container.
 - `*.localhost` resolves to `127.0.0.1` on most systems without `/etc/hosts` entries.
 - On OrbStack, `*.orb.local` domains work automatically for host→container access without Traefik. However, Traefik still provides consistent URLs across platforms.
 - Port 80 must be free on the host. Stop any local web servers first.
-- In this scenario, there is no SSL support and no custom domain support
+- In this scenario, there is no SSL support and no custom domain support.
+- A shared `microservices` network joins all stacks, so they can reach each other. The proxy in this repo (see the README) adds HTTPS with a mkcert certificate, a local domain, and one isolated edge network per stack that Traefik joins automatically.
 
 ---
 

@@ -1,329 +1,70 @@
-# Troubleshooting Guide
+# Troubleshooting
 
-Common issues and solutions for the Traefik local development environment.
+Start with:
 
-## Certificate Issues
-
-### Manual Certificate Renewal Failures
-
-**Symptom**: Renewal fails with error:
-```
-Failed to renew certificate with error: The manual plugin is not working
-PluginError('An authentication script must be provided with --manual-auth-hook...')
-```
-
-**Cause**: Certificates generated with `certbot --manual` cannot auto-renew.
-
-**Solution**: See [guides/certificate-renewal-issues.md](guides/certificate-renewal-issues.md) for detailed fixes.
-
-**Quick fix**:
 ```bash
-# Delete old manual certificates
-sudo certbot delete --cert-name OLD_CERT_NAME
-
-# OR migrate to DNS automation
-sudo certbot certonly --force-renewal --dns-cloudflare \
-  --dns-cloudflare-credentials ~/.secrets/cloudflare.ini \
-  -d '*.example.dev' -d 'example.dev'
+make status                       # containers + networks and aliases of Traefik
+docker compose logs network-sync  # connect / disconnect decisions
+docker compose logs traefik
 ```
 
-### TLS Certificate Store Not Found
+## The name does not resolve
 
-**Symptom**: Traefik logs show:
-```
-TLS: No certificate store found with this name: "default"
-Error: open /etc/ssl/example.dev.key: permission denied
-```
+- Is the dns container up? `make status`.
+- Does the container answer? `nslookup shop.freyr.test 127.0.0.1` must give `127.0.0.1`.
+- Is the resolver configured? macOS: `cat /etc/resolver/<DOMAIN>`; Linux:
+  `resolvectl status` must show `~<DOMAIN>`. If not, run `make dns`.
+- macOS: test with `dscacheutil -q host -a name shop.freyr.test`. `dig` and
+  `nslookup` without a server do not read `/etc/resolver`.
+- `DOMAIN` changed? The resolver file has the old name: `make remove-dns`
+  with the old value, then `make dns`.
+- Port 53 is in use (`make start` fails on the dns container): set
+  `DNS_PORT=5353` in `.env`, then `make start dns`.
 
-**Cause**: SSL key file has incorrect permissions.
+## Certificate warning in the browser
 
-**Solution**:
-```bash
-# Fix permissions
-sudo chmod 644 ssl/example.dev.key ssl/example.dev.crt
+- Restart the browser after the first `mkcert -install`.
+- Firefox: install nss (`brew install nss`) and run `make certs` again.
+- The host has two levels under the wildcard (`api.shop.freyr.test`): add
+  `*.shop.freyr.test` to `CERT_EXTRA_NAMES`, then `make renew-certs`.
+- `make cert-info` shows the names of the certificate. They must include
+  `*.<DOMAIN>`. After a `DOMAIN` change, run `make certs`.
+- The browser shows "TRAEFIK DEFAULT CERT": Traefik did not load
+  `ssl/local.crt`. Run `make certs` and `make restart`.
 
-# Restart Traefik
-docker compose restart traefik
-```
+## 404 page not found
 
-### Certificate Validation Errors in Browser
+Traefik has no router for that host.
 
-**Symptom**: Browser shows "NET::ERR_CERT_INVALID" or similar.
+- The container has `traefik.enable=true`, and the `Host()` rule has the exact name.
+- The dashboard (`https://traefik.<DOMAIN>`) lists the routers and their errors.
+- Two containers define a router with the same name: rename one.
 
-**Solutions**:
-1. **Check you're using fullchain**: Must use `fullchain.pem`, not `cert.pem`
-   ```bash
-   openssl x509 -in ssl/example.dev.crt -text -noout | grep "Issuer:"
-   ```
+## 504 Gateway Timeout or 502 Bad Gateway
 
-2. **Verify certificate is valid**:
-   ```bash
-   openssl x509 -in ssl/example.dev.crt -noout -dates
-   ```
+Traefik has the router but cannot reach the container.
 
-3. **Check certificate matches domain**:
-   ```bash
-   openssl x509 -in ssl/example.dev.crt -noout -text | grep DNS:
-   # Should show: DNS:*.example.dev
-   ```
+- The `traefik.docker.network` label is missing or wrong. It must be the full
+  network name: `docker network ls` shows it (`<project>_edge`).
+- Traefik is not on that network: `make status`. If it is missing, see the
+  network-sync log, or run `make sync-networks`.
+- The service listens on a port other than the one Traefik uses: set
+  `traefik.http.services.<name>.loadbalancer.server.port`.
 
-## DNS Resolution Issues
+## A container cannot call https://<host>
 
-### ERR_NAME_NOT_RESOLVED
+- It must be on the same edge network as the routed service. Aliases exist
+  only there.
+- It must trust the CA: mount `ssl/rootCA.pem` (see README). For a test:
+  `curl --cacert /path/rootCA.pem https://shop.freyr.test`.
 
-**Symptom**: Browser cannot resolve `*.example.dev` domains.
+## "Network <project>_edge Resource is still in use" at docker compose down
 
-**Check DNS resolution**:
-```bash
-# Test DNS
-dig traefik.example.dev
-# Should return: 172.16.123.1
+Compose removed the network before network-sync disconnected Traefik. This
+message is harmless: network-sync removes the network a moment later, when the
+stack has no containers. Check with `docker network ls`.
 
-# Check system DNS cache
-dscacheutil -q host -a name traefik.example.dev
-```
+## Traefik is on no edge network after a restart
 
-**Solutions**:
-
-1. **Wait for DNS propagation** (5-10 minutes after DNS changes)
-
-2. **Flush DNS cache**:
-   ```bash
-   # macOS
-   sudo dscacheutil -flushcache
-   sudo killall -HUP mDNSResponder
-
-   # Linux
-   sudo systemd-resolve --flush-caches
-   ```
-
-3. **Check VPN interference**: Disconnect VPN or configure split-DNS
-
-4. **Verify DNS A record**: Should be `*.example.dev → 172.16.123.1`
-
-### VPN Blocking Local Resolution
-
-**Symptom**: Works without VPN, fails with VPN connected.
-
-**Check**:
-```bash
-# View DNS configuration
-scutil --dns | head -20
-
-# Test with VPN DNS
-dig @127.0.0.1 traefik.example.dev
-```
-
-**Solution**: VPN is configured correctly if corporate DNS can resolve public domains. No action needed.
-
-## Loopback Alias Issues
-
-### Alias Not Active
-
-**Symptom**: `ifconfig` doesn't show `172.16.123.1`.
-
-**Check**:
-```bash
-# macOS
-ifconfig lo0 | grep 172.16.123.1
-
-# Linux
-ifconfig lo | grep 172.16.123.1
-```
-
-**Solutions**:
-
-**macOS**:
-```bash
-# Check LaunchDaemon status
-sudo launchctl list | grep runlevel1
-
-# Reinstall
-sudo make remove-loopback
-sudo make create-loopback
-
-# Check logs
-tail -f /var/log/loopback-alias.log
-```
-
-**Linux**:
-```bash
-# Check systemd service (if configured)
-systemctl status loopback-alias
-
-# Manual setup
-sudo ifconfig lo:0 172.16.123.1 netmask 255.240.0.0 up
-```
-
-### Alias Doesn't Persist After Reboot
-
-**macOS**:
-```bash
-# Verify LaunchDaemon is loaded
-sudo launchctl list | grep runlevel1
-# Should show com.runlevel1.lo0.172.16.123.1
-
-# Check plist exists
-ls -la /Library/LaunchDaemons/com.runlevel1*
-
-# Reinstall if needed
-sudo make create-loopback
-```
-
-**Linux**:
-```bash
-# Check if systemd service is enabled
-systemctl is-enabled loopback-alias
-
-# Enable if not
-sudo systemctl enable loopback-alias
-```
-
-## Traefik Issues
-
-### Traefik Not Starting
-
-**Check container status**:
-```bash
-docker compose ps
-docker compose logs traefik --tail=50
-```
-
-**Common causes**:
-
-1. **Port already in use**:
-   ```bash
-   # Check what's using port 80/443
-   sudo lsof -i :80
-   sudo lsof -i :443
-   ```
-
-2. **Configuration error**:
-   ```bash
-   # Validate config
-   docker compose config
-   ```
-
-3. **Missing network**:
-   ```bash
-   # Create external network
-   make create-network
-   ```
-
-### Cannot Access Dashboard
-
-**URL**: https://traefik.example.dev/dashboard/
-
-**Checks**:
-```bash
-# 1. Verify Traefik is running
-docker compose ps
-
-# 2. Test direct connection
-curl -k https://traefik.example.dev
-
-# 3. Check Traefik router configuration
-docker compose logs traefik | grep dashboard
-```
-
-### Services Not Accessible Through Traefik
-
-**Symptom**: Traefik dashboard works, but application services don't.
-
-**Check**:
-1. **Service connected to `local` network**:
-   ```yaml
-   networks:
-     local:
-       external: true
-   ```
-
-2. **Traefik labels configured**:
-   ```yaml
-   labels:
-     traefik.enable: true
-     traefik.http.routers.myapp.rule: "Host(`myapp.example.dev`)"
-     traefik.http.routers.myapp.tls: true
-   ```
-
-3. **Service is running**:
-   ```bash
-   docker compose ps
-   ```
-
-## Platform-Specific Issues
-
-### macOS: Permission Denied Errors
-
-Most scripts require `sudo` on macOS:
-```bash
-# Correct usage
-sudo make create-loopback
-sudo make setup-certs
-sudo make setup-auto-renewal
-
-# NOT: make create-loopback (will fail)
-```
-
-### macOS: Homebrew Python PEP 668 Error
-
-**Symptom**: `pip install` blocked with "externally-managed-environment" error.
-
-**Solution**:
-```bash
-# Use --break-system-packages for certbot plugins
-python3 -m pip install --break-system-packages certbot-dns-cloudflare
-```
-
-See [guides/cloudflare-dns-plugin.md](guides/cloudflare-dns-plugin.md) for details.
-
-### Linux: Systemd Service Not Found
-
-Some scripts are macOS-specific (LaunchDaemons). Linux equivalents TBD.
-
-**Current workaround**: Use manual setup or cron jobs.
-
-## Getting Help
-
-1. **Check logs**:
-   ```bash
-   # Traefik logs
-   docker compose logs traefik --tail=100 -f
-
-   # Loopback LaunchDaemon logs (macOS)
-   tail -f /var/log/loopback-alias.log
-
-   # Certificate renewal logs (macOS)
-   tail -f /var/log/certbot-renew.log
-
-   # Let's Encrypt logs
-   sudo cat /var/log/letsencrypt/letsencrypt.log
-   ```
-
-2. **Verify setup**:
-   ```bash
-   # DNS
-   dig traefik.example.dev
-
-   # Loopback
-   ifconfig lo0 | grep 172.16.123.1  # macOS
-   ifconfig lo | grep 172.16.123.1   # Linux
-
-   # Certificates
-   openssl x509 -in ssl/example.dev.crt -noout -dates
-
-   # Docker
-   docker compose ps
-   docker network ls | grep local
-   ```
-
-3. **Check documentation**:
-   - [SETUP.md](SETUP.md) - Initial setup guide
-   - [CLAUDE.md](CLAUDE.md) - Development reference
-   - [guides/](guides/) - Detailed guides
-
-4. **Reset and start fresh**:
-   ```bash
-   make destroy
-   make create
-   ```
+network-sync connects all networks again when Traefik starts. If the
+network-sync container is down: `make start`. To force a sync: `make sync-networks`.

@@ -278,12 +278,17 @@ Test your changes on:
 
 ```
 traefik/
+├── compose.yaml         # traefik, dns, network-sync (static Traefik config in command:)
+├── configs/             # Traefik dynamic configuration (file provider)
+├── docker/dnsmasq/      # Image of the dns container
+├── examples/            # Demo stacks (make demo-up / demo-test)
 ├── scripts/
-│   ├── common/          # Shared utilities (IMPORTANT: all scripts should use)
-│   ├── loopback/        # Platform-specific loopback management
-│   ├── certificates/    # Certificate management
-│   └── setup/           # Configuration generation
-├── configs/             # Traefik configuration templates
+│   ├── common/          # load-config.sh (all Bash scripts source it)
+│   ├── certs/           # mkcert certificate
+│   ├── dns/             # Host resolver for DOMAIN
+│   ├── networks/        # network-sync (POSIX sh, runs in a container)
+│   ├── demo/            # End-to-end checks
+│   └── legacy/          # Cleanup of the Let's Encrypt version
 ├── guides/              # Detailed guides (topic-specific)
 └── [documentation]      # README, SETUP, CONTRIBUTING, etc.
 ```
@@ -292,26 +297,23 @@ traefik/
 
 1. **Use common config loader**
    ```bash
-   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-   source "${SCRIPT_DIR}/../common/load-config.sh"
+   source "$(dirname "$0")/../common/load-config.sh"
    ```
 
-2. **Add to Makefile** if user-facing
+2. **Add to Makefile** if user-facing, with a `##` description
 
-3. **Document in appropriate README**
-   - `scripts/loopback/README.md`
-   - `scripts/certificates/README.md`
-   - `scripts/setup/README.md`
+3. **Document it** in `scripts/README.md`
 
 ### Adding New Configuration
 
-1. **Create template** in `configs/` or relevant directory
-   - Use `{{VARIABLE}}` syntax
-   - Add `.template` extension
+- Static Traefik options: add a flag to `command:` in `compose.yaml`; take
+  values from `.env` with `${VAR:-default}` and add `VAR` to `.env.example`.
+- Dynamic options (TLS, middlewares): add a file to `configs/`; Traefik
+  watches the directory.
 
-2. **Update generate-configs.sh** to generate it
+### Testing
 
-3. **Add to .gitignore** (generated file)
+Run `make demo-up && make demo-test && make demo-down` before a pull request.
 
 4. **Document** in README.md and SETUP.md
 
