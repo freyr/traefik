@@ -20,6 +20,7 @@ make dns           # resolver for DOMAIN -> dns container
 make sync-networks # force network-sync pass
 make demo-up && make demo-test && make demo-down   # end-to-end check
 make remove-legacy # remove loopback alias + certbot renewal of the old setup
+make qa            # ShellCheck, shfmt, actionlint, compose + Traefik config checks, bats tests (Docker)
 ```
 
 ## Architecture
@@ -33,6 +34,7 @@ make remove-legacy # remove loopback alias + certbot renewal of the old setup
 
 - PR titles follow Conventional Commits; the title is the squash commit and sets the release (`feat:` minor, `fix:`/`perf:` patch, `!` major, other types none).
 - Required checks: `pr-title`, `version` (`pr.yml`) and `ci-gate` (`ci.yml`). Add every new CI job to `ci-gate.needs`.
+- Run `make qa` before a PR. A script change needs a bats test in `tests/`.
 - Never create tags by hand. `release.yml` pushes `vX.Y.Z` on main; config in `.github/release.json` (no version files).
 
 ## Boundaries
