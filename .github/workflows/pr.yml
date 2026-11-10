@@ -1,5 +1,4 @@
 # Required checks: pr-title, version (this workflow) and ci-gate (ci.yml).
-# Replace FREYR_SHA with the commit of freyr/.github (Dependabot keeps it current).
 name: PR
 
 on:
@@ -17,12 +16,12 @@ jobs:
   pr-title:
     runs-on: ubuntu-latest
     steps:
-      - uses: freyr/.github/actions/pr-title@FREYR_SHA # v1.0.0
+      - uses: freyr/.github/actions/pr-title@3f8fbbcf74283946ee3a7f63e21dd19bf02cdb77 # v1.0.0
 
   version:
     runs-on: ubuntu-latest
     steps:
-      - uses: freyr/.github/actions/version@FREYR_SHA # v1.0.0
+      - uses: freyr/.github/actions/version@3f8fbbcf74283946ee3a7f63e21dd19bf02cdb77 # v1.0.0
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

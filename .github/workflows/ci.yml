@@ -28,6 +28,6 @@ jobs:
     needs: [lint]
     runs-on: ubuntu-latest
     steps:
-      - uses: freyr/.github/actions/ci-gate@FREYR_SHA # v1.0.0
+      - uses: freyr/.github/actions/ci-gate@3f8fbbcf74283946ee3a7f63e21dd19bf02cdb77 # v1.0.0
         with:
           results: ${{ join(needs.*.result, ' ') }}
