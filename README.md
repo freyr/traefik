@@ -26,6 +26,18 @@ flowchart LR
   BW --- BB[(beta backend)]
 ```
 
+## Versions
+
+Use a release tag, not `main`. Each change to `main` gets a tag `vX.Y.Z` and a
+[GitHub release](https://github.com/freyr/traefik/releases) with its notes. To update an
+existing checkout to a new release:
+
+```bash
+git fetch --tags
+git checkout vX.Y.Z
+make start
+```
+
 ## Quick start
 
 ```bash

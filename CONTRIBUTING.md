@@ -107,7 +107,9 @@ Branch naming:
 
 ### Commit Messages
 
-Follow this format:
+Pull requests are squash-merged. The PR title becomes the commit on `main`, and it sets
+the next release (see [PR Title Format](#pull-request-process)). The commits on your
+branch are free text, but this format is recommended:
 
 ```
 <type>: <short summary>
@@ -252,10 +254,24 @@ Test your changes on:
    - Link related issues
 
 4. **PR Title Format**
-   ```
-   <type>: <short description>
-   ```
+
+   The title must follow [Conventional Commits](https://www.conventionalcommits.org/).
+   The `pr-title` check enforces it. The title is the squash commit on `main` and the
+   only release input:
+
+   | PR title | Release |
+   |---|---|
+   | `feat: …` | minor (`v1.2.0` → `v1.3.0`) |
+   | `fix: …`, `perf: …`, `revert: …` | patch (`v1.2.0` → `v1.2.1`) |
+   | `feat!: …`, or `BREAKING CHANGE:` in the PR body | major (`v1.2.0` → `v2.0.0`) |
+   | `docs:`, `test:`, `ci:`, `build:`, `refactor:`, `chore:`, `style:` | no release |
+
+   A PR that changes only Markdown files, `guides/` or `.idea/` makes no release.
+
    Example: `feat: add Windows PowerShell scripts for loopback alias`
+
+   Do not create tags by hand. After the merge, the release workflow pushes the tag
+   `vX.Y.Z` and creates the GitHub release.
 
 5. **PR Description Should Include**
    - What problem does this solve?
@@ -270,7 +286,8 @@ Test your changes on:
 - Be responsive to feedback
 - Make requested changes in new commits
 - Don't force-push after review starts
-- Once approved, maintainer will merge
+- The required checks are `pr-title`, `version` and `ci-gate`
+- When the checks pass, the PR is squash-merged
 
 ## Project Structure
 

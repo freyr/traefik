@@ -1,0 +1,27 @@
+# On each push to main, push the next tag (vX.Y.Z) and create the GitHub release.
+# This repo has no version file: the next tag comes from the last tag and the squash
+# commit title. The release App pushes the tag.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      releases: ${{ steps.release.outputs.releases }}
+    steps:
+      - id: release
+        uses: freyr/.github/actions/release@3f8fbbcf74283946ee3a7f63e21dd19bf02cdb77 # v1.0.0
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
